@@ -1,0 +1,141 @@
+/******************************************************
+ * Oorja Bills ChatGPT Project
+ * TriggerService.gs
+ * Version : 1.1.0
+ * Client  : BSNL Rajasthan
+ * Author  : Amit Kumar + ChatGPT
+ ******************************************************/
+
+const TRIGGER_FUNCTION = "productionRun";
+
+/**
+ * Create Daily Trigger (11:30 AM)
+ */
+function createDailyTrigger() {
+
+  removeDailyTrigger(false);
+
+  ScriptApp.newTrigger(TRIGGER_FUNCTION)
+    .timeBased()
+    .everyDays(1)
+    .atHour(11)
+    .nearMinute(30)
+    .create();
+
+  SpreadsheetApp.getActive().toast(
+    "Daily trigger created (11:30 AM)",
+    "Oorja Bills",
+    5
+  );
+
+  SpreadsheetApp.getUi().alert(
+    "Success",
+    "Daily trigger has been created.\n\nRuns every day around 11:30 AM.",
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+
+  viewTriggerStatus();
+}
+
+/**
+ * Remove Trigger
+ */
+function removeDailyTrigger(showMessage) {
+
+  if (showMessage === undefined) showMessage = true;
+
+  const triggers = ScriptApp.getProjectTriggers();
+  let removed = 0;
+
+  triggers.forEach(function(trigger){
+
+    if(trigger.getHandlerFunction() === TRIGGER_FUNCTION){
+
+      ScriptApp.deleteTrigger(trigger);
+      removed++;
+
+    }
+
+  });
+
+  if(showMessage){
+
+    SpreadsheetApp.getUi().alert(
+      "Trigger Service",
+      removed + " trigger(s) removed.",
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+
+  }
+
+}
+
+/**
+ * View Trigger Status
+ */
+function viewTriggerStatus(){
+
+  const triggers = ScriptApp.getProjectTriggers();
+
+  let msg = "";
+
+  if(triggers.length === 0){
+
+    msg = "No active trigger found.";
+
+  }else{
+
+    triggers.forEach(function(t,i){
+
+      msg +=
+        (i+1)+". Function : "+t.getHandlerFunction()+"\n";
+
+    });
+
+  }
+
+  SpreadsheetApp.getUi().alert(
+    "Current Trigger Status",
+    msg,
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+
+}
+
+/**
+ * Trigger Diagnostics
+ */
+function triggerDiagnostics(){
+
+  const triggers = ScriptApp.getProjectTriggers();
+
+  Logger.log("===== Trigger Diagnostics =====");
+
+  Logger.log("Total Triggers : " + triggers.length);
+
+  triggers.forEach(function(t){
+
+    Logger.log(
+      "Function : " + t.getHandlerFunction()
+    );
+
+    Logger.log(
+      "Source : " + t.getTriggerSource()
+    );
+
+    Logger.log("-----------------------");
+
+  });
+
+}
+
+/**
+ * Recreate Trigger
+ */
+function recreateDailyTrigger(){
+
+  removeDailyTrigger(false);
+
+  createDailyTrigger();
+
+}
