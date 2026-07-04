@@ -1,121 +1,119 @@
 /******************************************************
- * Oorja Bills ChatGPT Project
+ * Oorja Bills Management System (OBMS)
  * WhatsAppService.gs
- * Version : 1.0.1
+ * Version : 1.2.0 (Robofast Edition)
  * Client  : BSNL Rajasthan
- * Author  : Amit Kumar + ChatGPT
  ******************************************************/
 
-function sendWhatsApp(number, message) {
+/**
+ * Send one WhatsApp message using Robofast API.
+ * Returns:
+ * {
+ *   success,
+ *   status,
+ *   response,
+ *   messageId
+ * }
+ */
+function sendWhatsApp(number, message){
 
-  number = getSendMobile(number);
+  if(CONFIG.DRY_RUN){
 
-  if (CONFIG.DRY_RUN) {
+    log("DRY RUN : " + number);
+
     return {
-      success: true,
-      status: "DRY RUN",
-      httpCode: 0,
-      response: "Message not sent (DRY RUN)",
-      messageId: ""
+      success:true,
+      status:"DRY_RUN",
+      response:"DRY_RUN",
+      messageId:""
     };
+
   }
 
-  try {
+  const payload = {
+    to: String(number),
+    message: message,
+    account: CONFIG.ACCOUNT_ID
+  };
 
-    const url = buildApiUrl(number, message);
+  const options = {
+    method : "post",
+    contentType : "application/json",
+    headers : {
+      "X-API-Key" : CONFIG.API_KEY
+    },
+    payload : JSON.stringify(payload),
+    muteHttpExceptions : true
+  };
 
-    log("Sending WhatsApp to : " + number);
+  try{
 
-    const response = UrlFetchApp.fetch(url, {
-      muteHttpExceptions: true,
-      followRedirects: true
-    });
+    const response = UrlFetchApp.fetch(
+      CONFIG.WHATSAPP_URL,
+      options
+    );
 
-    const httpCode = response.getResponseCode();
+    const code = response.getResponseCode();
     const body = response.getContentText();
 
     let json = {};
-    try {
+
+    try{
       json = JSON.parse(body);
-    } catch (e) {
-      json = {};
-    }
+    }catch(e){}
 
-    const success = (json.status === "success");
-
-    log("HTTP : " + httpCode + " | Status : " + (success ? "SUCCESS" : "FAILED"));
+    const ok = (code === 200 && json.success === true);
 
     return {
-      success: success,
-      status: success ? "SUCCESS" : "FAILED",
-      httpCode: httpCode,
-      response: body,
-      messageId: json.message_id || json.queue_id || json.id || ""
+      success : ok,
+      status : ok ? "SUCCESS (200)" : "FAILED ("+code+")",
+      response : body,
+      messageId : json.message_id || ""
     };
 
-  } catch (error) {
-
-    log("ERROR : " + error);
+  }catch(err){
 
     return {
-      success: false,
-      status: "ERROR",
-      httpCode: 0,
-      response: error.toString(),
-      messageId: ""
+      success:false,
+      status:"EXCEPTION",
+      response:String(err),
+      messageId:""
     };
 
   }
 
 }
 
-function updateDeliveryStatus(rowNumber, result) {
+/**
+ * Send one packet and update sheet.
+ */
+function sendPacket(recipient, packet){
 
-  const sheet = getSheet();
-
-  sheet.getRange(rowNumber, COL ? COL.STATUS : 6)
-       .setValue(result.status + " (" + result.httpCode + ")");
-
-  sheet.getRange(rowNumber, COL ? COL.API_RESPONSE : 7)
-       .setValue(result.response);
-
-}
-
-function updateMessageId(rowNumber, messageId) {
-
-  if (!messageId) return;
-
-  const sheet = getSheet();
-
-  sheet.getRange(rowNumber, COL ? COL.MESSAGE_ID : 8)
-       .setValue(messageId);
-
-}
-
-function sendPacket(recipient, packet) {
+  const mobile = getSendMobile(recipient.mobile);
 
   const result = sendWhatsApp(
-    recipient.mobile,
+    mobile,
     packet.message
   );
 
+  // Update original rows
   packet.bills.forEach(function(bill){
 
-    updateDeliveryStatus(
-      bill.rowNumber,
-      result
-    );
+    const row = bill.row;
 
-    updateMessageId(
-      bill.rowNumber,
-      result.messageId
-    );
+    getSheet().getRange(row,6).setValue(result.status);
+    getSheet().getRange(row,7).setValue(result.response);
+    getSheet().getRange(row,8).setValue(result.messageId);
 
   });
 
-  log(recipient.mobile + " --> " + result.status);
-
+  // Random delay between packets (1–2 sec)
   shortDelay();
+
+  log(
+    mobile + " -> " +
+    result.status
+  );
 
   return result;
 
